@@ -26,16 +26,31 @@ const pool = mysql.createPool({
 async function initTable() {
   const conn = await pool.getConnection();
   try {
+    // 学生表：改为 姓名+专业+年级 联合主键，支持同名不同专业/年级
     await conn.query(`CREATE TABLE IF NOT EXISTS students (
-      py VARCHAR(100) PRIMARY KEY,
+      py VARCHAR(100) NOT NULL,
       k BIGINT,
-      major VARCHAR(100),
-      grade_year INT,
-      vote INT,
-      si INT,
-      story TEXT
+      major VARCHAR(100) NOT NULL,
+      grade_year INT NOT NULL,
+      vote INT DEFAULT 0,
+      si INT DEFAULT 1,
+      story TEXT,
+      PRIMARY KEY (py, major, grade_year)
+    )`);
+
+    // 投票日志表：记录IP每日投票次数
+    await conn.query(`CREATE TABLE IF NOT EXISTS vote_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      ip VARCHAR(50) NOT NULL,
+      student_name VARCHAR(100) NOT NULL,
+      major VARCHAR(100) NOT NULL,
+      grade_year INT NOT NULL,
+      vote_date DATE NOT NULL,
+      vote_count INT DEFAULT 1,
+      UNIQUE KEY unique_ip_student (ip, student_name, major, grade_year, vote_date)
     )`);
     
+    // 检查表是否为空，插入初始数据
     const [rows] = await conn.query("SELECT COUNT(*) as count FROM students");
     if (rows[0].count === 0) {
       const initData = [
@@ -58,6 +73,7 @@ async function initTable() {
           [item[0], k, item[1], item[2], item[3], item[4], item[5]]
         );
       }
+      console.log("初始数据插入完成");
     }
   } finally {
     conn.release();
